@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Ticket Triage</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --card2:#243449; --text:#e2e8f0;
+          --muted:#94a3b8; --line:#334155; --blue:#2563eb; --blue2:#1d4ed8; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         background:var(--bg); color:var(--text); }
+  header { padding:18px 28px; border-bottom:1px solid var(--line); display:flex;
+           align-items:center; gap:14px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  .badge { font-size:12px; padding:3px 9px; border-radius:999px; background:#334155; color:var(--muted); }
+  #live.on { background:#065f46; color:#a7f3d0; }
+  .spacer { flex:1; }
+  main { padding:24px 28px; max-width:1150px; margin:0 auto; }
+  input, textarea, button, select { padding:9px 11px; border-radius:8px;
+     border:1px solid var(--line); background:var(--card2); color:var(--text); font-size:14px; }
+  textarea { width:100%; min-height:90px; resize:vertical; font-family:inherit; }
+  button { cursor:pointer; background:var(--blue); border-color:var(--blue); font-weight:600; }
+  button:hover { background:var(--blue2); }
+  button.ghost { background:transparent; border-color:var(--line); color:var(--muted); font-weight:500; }
+  button.sm { padding:6px 10px; font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:22px; }
+  .card h2 { margin:0 0 14px; font-size:15px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .field { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+  .field label { font-size:12px; color:var(--muted); }
+  .grid2 { display:grid; grid-template-columns: 1.1fr 1fr; gap:22px; align-items:start; }
+  @media (max-width: 860px){ .grid2{ grid-template-columns:1fr; } }
+  .stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 16px; min-width:120px; }
+  .stat .n { font-size:22px; font-weight:700; }
+  .stat .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border-radius:12px; overflow:hidden; }
+  th, td { text-align:left; padding:11px 14px; border-bottom:1px solid var(--line); font-size:14px; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; }
+  tr:last-child td { border-bottom:none; }
+  tr.clickable:hover { background:var(--card2); cursor:pointer; }
+  .pill { padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; }
+  .s-new { background:#334155; color:#cbd5e1; }
+  .s-processing { background:#78350f; color:#fde68a; }
+  .s-triaged { background:#064e3b; color:#6ee7b7; }
+  .s-failed { background:#7f1d1d; color:#fecaca; }
+  .s-closed { background:#1e3a8a; color:#bfdbfe; }
+  .u { display:inline-block; width:30px; text-align:center; border-radius:6px; font-weight:700; padding:2px 0; }
+  .muted { color:var(--muted); }
+  .hidden { display:none; }
+  .msg { font-size:13px; margin-top:8px; min-height:18px; }
+  .msg.ok { color:#6ee7b7; }
+  .msg.err { color:#fca5a5; }
+  .detail { background:var(--card2); font-size:13px; line-height:1.6; }
+  .detail b { color:var(--text); }
+  .editbar { margin-top:12px; padding-top:12px; border-top:1px dashed var(--line);
+             display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .editbar small { color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#127915; AI Ticket Triage</h1>
+  <span id="live" class="badge">&#9679; offline</span>
+  <span class="spacer"></span>
+  <span id="whoami" class="badge hidden"></span>
+  <button id="logoutBtn" class="ghost hidden sm" onclick="logout()">Log out</button>
+</header>
+
+<main>
+  <!-- LOGIN / REGISTER -->
+  <div id="authCard" class="card" style="max-width:460px;">
+    <h2>Sign in to submit &amp; view tickets</h2>
+    <div class="field"><label>Email</label>
+      <input id="email" placeholder="you@example.com" value="customer@demo.com" /></div>
+    <div class="field"><label>Password</label>
+      <input id="password" type="password" placeholder="password" value="password123" /></div>
+    <div class="row">
+      <button onclick="login()">Log in</button>
+      <button class="ghost" onclick="register()">Create account</button>
+    </div>
+    <div id="authMsg" class="msg"></div>
+    <div class="muted" style="font-size:12px; margin-top:10px;">
+      Demo: <b>customer@demo.com</b> (submits) &middot; <b>agent@demo.com</b> (manages) &middot; pw <b>password123</b>
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div id="app" class="hidden">
+    <div id="agentNote" class="card hidden">
+      <h2>&#127903; Agent view</h2>
+      <p class="muted" style="font-size:13px; margin:0; line-height:1.6;">
+        Signed in as an <b>agent</b>. You see <b>everyone's</b> tickets, sorted worst-first.
+        Click a ticket to read the AI result and to <b>override the AI</b>, <b>reprocess</b>, or <b>mark it resolved</b>.
+      </p>
+    </div>
+
+    <div id="customerArea" class="grid2">
+      <div class="card">
+        <h2>&#128221; Submit a support ticket</h2>
+        <div class="field"><label>Subject</label>
+          <input id="subject" placeholder="e.g. I was charged twice this month" /></div>
+        <div class="field"><label>Describe your problem</label>
+          <textarea id="body" placeholder="Tell us what went wrong..."></textarea></div>
+        <button onclick="submitTicket()">Send ticket</button>
+        <div id="submitMsg" class="msg"></div>
+      </div>
+      <div class="card">
+        <h2>&#129302; How it works</h2>
+        <p class="muted" style="font-size:13px; line-height:1.6; margin:0;">
+          You send a ticket and get an <b>instant</b> confirmation. In the background, AI reads it
+          and decides its <b>category</b> and <b>urgency</b> (1-10), writes a summary, and drafts a
+          reply. Agents see everything below, sorted worst-first, updating live.
+        </p>
+      </div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="row" style="margin-bottom:10px;">
+      <h2 style="margin:0; font-size:15px;">Ticket queue</h2>
+      <span class="spacer"></span>
+      <small class="muted">Filter:</small>
+      <select id="statusFilter" onchange="loadTickets()">
+        <option value="">All statuses</option>
+        <option value="new">new</option>
+        <option value="processing">processing</option>
+        <option value="triaged">triaged</option>
+        <option value="failed">failed</option>
+        <option value="closed">closed</option>
+      </select>
+      <button class="ghost sm" onclick="refresh()">Refresh</button>
+    </div>
+    <table>
+      <thead><tr><th>Urg</th><th>Subject</th><th>Category</th><th>Status</th><th>AI summary</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+let token = null, email = null, userRole = "customer";
+const CATEGORIES = ["billing","bug","refund","account","other"];
+
+function setMsg(id, text, ok){ const el=document.getElementById(id); if(!el) return;
+  el.textContent=text; el.className="msg "+(ok?"ok":"err"); }
+
+async function api(path, opts){
+  opts = opts || {};
+  opts.headers = Object.assign({"Content-Type":"application/json"},
+    token ? {"Authorization":"Bearer "+token} : {}, opts.headers || {});
+  return fetch(path, opts);
+}
+
+async function register(){
+  email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  const r=await api("/auth/register",{method:"POST",body:JSON.stringify({email,password,role:"customer"})});
+  if(r.status===201){ setMsg('authMsg',"Account created! Logging in...",true); await login(); }
+  else if(r.status===409){ setMsg('authMsg',"That email exists - just log in.",false); }
+  else { setMsg('authMsg',"Could not register (password must be 8+ chars).",false); }
+}
+
+async function login(){
+  email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  const r=await api("/auth/login",{method:"POST",body:JSON.stringify({email,password})});
+  if(!r.ok){ setMsg('authMsg',"Login failed - check email/password.",false); return; }
+  const data=await r.json();
+  token=data.access_token; userRole=data.user.role;
+  document.getElementById('authCard').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  const who=document.getElementById('whoami');
+  who.textContent=email+" ("+userRole+")"; who.classList.remove('hidden');
+  document.getElementById('logoutBtn').classList.remove('hidden');
+  const isAgent = userRole==="agent";
+  document.getElementById('customerArea').classList.toggle('hidden', isAgent);
+  document.getElementById('agentNote').classList.toggle('hidden', !isAgent);
+  await refresh(); connectWS();
+}
+
+function logout(){
+  token=null; email=null; userRole="customer";
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('authCard').classList.remove('hidden');
+  document.getElementById('whoami').classList.add('hidden');
+  document.getElementById('logoutBtn').classList.add('hidden');
+  setMsg('authMsg',"",true);
+}
+
+async function submitTicket(){
+  const subject=document.getElementById('subject').value.trim();
+  const body=document.getElementById('body').value.trim();
+  if(!subject||!body){ setMsg('submitMsg',"Please fill in both fields.",false); return; }
+  const r=await api("/tickets",{method:"POST",body:JSON.stringify({subject,body})});
+  if(r.status===202){ setMsg('submitMsg',"Ticket received! AI is triaging it now...",true);
+    document.getElementById('subject').value=""; document.getElementById('body').value="";
+    setTimeout(refresh,1200);
+  } else if(r.status===429){ setMsg('submitMsg',"Slow down! Rate limit hit (max 10/min).",false); }
+  else { setMsg('submitMsg',"Something went wrong sending the ticket.",false); }
+}
+
+function urgColor(u){ if(u==null) return "#334155"; if(u>=8) return "#7f1d1d"; if(u>=5) return "#78350f"; return "#065f46"; }
+
+async function refresh(){ await Promise.all([loadStats(), loadTickets()]); }
+
+async function loadStats(){
+  const r=await api("/stats"); if(!r.ok) return; const s=await r.json();
+  document.getElementById('stats').innerHTML=`
+    <div class="stat"><div class="n">${s.total_tickets}</div><div class="l">Tickets</div></div>
+    <div class="stat"><div class="n">${s.avg_urgency?s.avg_urgency.toFixed(1):'-'}</div><div class="l">Avg urgency</div></div>
+    <div class="stat"><div class="n">${(s.cache_hit_rate*100).toFixed(0)}%</div><div class="l">Cache hits</div></div>
+    <div class="stat"><div class="n">${s.avg_ai_latency_ms?Math.round(s.avg_ai_latency_ms):'-'}ms</div><div class="l">AI latency</div></div>
+    <div class="stat"><div class="n">${s.total_tokens_used}</div><div class="l">Tokens</div></div>`;
+}
+
+async function loadTickets(){
+  const st=document.getElementById('statusFilter').value;
+  const url="/tickets?sort=-urgency_score&size=50"+(st?("&status="+st):"");
+  const r=await api(url); if(!r.ok) return; const data=await r.json();
+  const rows=document.getElementById('rows');
+  if(!data.items.length){ rows.innerHTML=`<tr><td colspan="5" class="muted">No tickets here yet.</td></tr>`; return; }
+  rows.innerHTML=data.items.map((t,i)=>ticketRow(t,i)).join('');
+}
+
+function ticketRow(t,i){
+  const main=`
+    <tr class="clickable" onclick="toggleDetail(${i})">
+      <td><span class="u" style="background:${urgColor(t.urgency_score)}">${t.urgency_score??'-'}</span></td>
+      <td>${esc(t.subject)}</td>
+      <td>${t.category??'<span class="muted">-</span>'}</td>
+      <td><span class="pill s-${t.status}">${t.status}</span></td>
+      <td class="muted">${t.ai_summary?esc(t.ai_summary):'-'}</td>
+    </tr>`;
+  let editbar="";
+  if(userRole==="agent"){
+    const opts=CATEGORIES.map(c=>`<option value="${c}" ${t.category===c?'selected':''}>${c}</option>`).join('');
+    editbar=`
+      <div class="editbar">
+        <small>Override:</small>
+        <select id="cat-${i}">${opts}</select>
+        <input id="urg-${i}" type="number" min="1" max="10" value="${t.urgency_score??5}" style="width:70px" />
+        <button class="sm" onclick="saveTicket('${t.id}',${i})">Save</button>
+        <button class="ghost sm" onclick="reprocess('${t.id}')">Reprocess AI</button>
+        <button class="ghost sm" onclick="resolveTicket('${t.id}')">Mark resolved</button>
+        <span id="editmsg-${i}" class="msg" style="margin:0"></span>
+      </div>`;
+  }
+  const detail=`
+    <tr id="detail-${i}" class="detail hidden"><td colspan="5">
+      <b>Full message:</b> ${esc(t.body)}<br>
+      <b>AI summary:</b> ${t.ai_summary?esc(t.ai_summary):'(pending)'}<br>
+      <b>Suggested reply:</b> ${t.suggested_reply?esc(t.suggested_reply):'(pending)'}
+      ${editbar}
+    </td></tr>`;
+  return main+detail;
+}
+
+function toggleDetail(i){ document.getElementById('detail-'+i).classList.toggle('hidden'); }
+
+async function saveTicket(id,i){
+  const category=document.getElementById('cat-'+i).value;
+  const urgency_score=parseInt(document.getElementById('urg-'+i).value,10);
+  const r=await api("/tickets/"+id,{method:"PATCH",body:JSON.stringify({category,urgency_score})});
+  if(r.ok){ setMsg('editmsg-'+i,"Saved!",true); setTimeout(refresh,600); }
+  else { setMsg('editmsg-'+i,"Save failed ("+r.status+")",false); }
+}
+
+async function resolveTicket(id){
+  const r=await api("/tickets/"+id,{method:"PATCH",body:JSON.stringify({status:"closed"})});
+  if(r.ok) refresh();
+}
+
+async function reprocess(id){
+  const r=await api("/tickets/"+id+"/reprocess",{method:"POST"});
+  if(r.status===202) setTimeout(refresh,1200);
+}
+
+function connectWS(){
+  const proto=location.protocol==="https:"?"wss":"ws";
+  const ws=new WebSocket(`${proto}://${location.host}/ws/tickets`);
+  const live=document.getElementById('live');
+  ws.onopen=()=>{ live.innerHTML="&#9679; live"; live.classList.add('on'); };
+  ws.onclose=()=>{ live.innerHTML="&#9679; offline"; live.classList.remove('on'); setTimeout(connectWS,3000); };
+  ws.onmessage=()=>{ refresh(); };
+}
+
+function esc(s){ return (s||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>

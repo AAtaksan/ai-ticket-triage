@@ -1,0 +1,57 @@
+# Render Blueprint — one file that provisions your whole backend.
+# In Render: New + → "Blueprint" → connect your GitHub repo → it reads this.
+#
+# This creates: an API web service, a background worker, and a free Postgres.
+# Redis is NOT in Render's free plan, so we use a free Upstash Redis and paste
+# its URL into REDIS_URL (see DEPLOY.md).
+services:
+  - type: web
+    name: triage-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: ./docker/entrypoint.sh
+    healthCheckPath: /health
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: triage-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false          # paste your Upstash URL in the dashboard
+      - key: JWT_SECRET
+        generateValue: true  # Render generates a strong random secret
+      - key: LLM_PROVIDER
+        value: anthropic      # or "openai", or "mock" to run with no key
+      - key: ANTHROPIC_API_KEY
+        sync: false          # paste your key in the dashboard (kept secret)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+
+  - type: worker
+    name: triage-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: arq app.workers.worker.WorkerSettings
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: triage-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: LLM_PROVIDER
+        value: anthropic
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+databases:
+  - name: triage-db
+    plan: free
+    databaseName: triage
+    user: triage

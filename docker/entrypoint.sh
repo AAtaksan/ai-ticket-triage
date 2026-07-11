@@ -28,6 +28,9 @@ PY
 echo "Running migrations..."
 alembic upgrade head
 
+echo "Seeding agent account..."
+python -m scripts.seed || echo "Seeding skipped or already done."
+
 echo "Starting background worker..."
 arq app.workers.worker.WorkerSettings &
 

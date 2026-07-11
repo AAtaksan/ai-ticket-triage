@@ -16,5 +16,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
+# Fix Windows CRLF line endings & make entrypoint executable
+RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
+
 # Default command is overridden per-service in docker-compose.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

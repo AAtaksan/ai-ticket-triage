@@ -1,9 +1,10 @@
 # Render Blueprint — one file that provisions your whole backend.
 # In Render: New + → "Blueprint" → connect your GitHub repo → it reads this.
 #
-# This creates: an API web service, a background worker, and a free Postgres.
-# Redis is NOT in Render's free plan, so we use a free Upstash Redis and paste
-# its URL into REDIS_URL (see DEPLOY.md).
+# This creates: an API web service and a background worker.
+# Postgres: use a free Neon database and paste its URL as DATABASE_URL.
+# Redis: use a free Upstash Redis and paste its URL as REDIS_URL.
+# See DEPLOY.md for full setup instructions.
 services:
   - type: web
     name: triage-api
@@ -14,9 +15,7 @@ services:
     plan: free
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: triage-db
-          property: connectionString
+        sync: false          # paste your Neon connection string in the dashboard
       - key: REDIS_URL
         sync: false          # paste your Upstash URL in the dashboard
       - key: JWT_SECRET
@@ -38,9 +37,7 @@ services:
     plan: free
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: triage-db
-          property: connectionString
+        sync: false          # same Neon connection string as the API
       - key: REDIS_URL
         sync: false
       - key: LLM_PROVIDER
@@ -49,9 +46,3 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: llama-3.1-8b-instant
-
-databases:
-  - name: triage-db
-    plan: free
-    databaseName: triage
-    user: triage

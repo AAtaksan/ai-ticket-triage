@@ -22,11 +22,11 @@ services:
       - key: JWT_SECRET
         generateValue: true  # Render generates a strong random secret
       - key: LLM_PROVIDER
-        value: anthropic      # or "openai", or "mock" to run with no key
-      - key: ANTHROPIC_API_KEY
-        sync: false          # paste your key in the dashboard (kept secret)
-      - key: OPENAI_API_KEY
-        sync: false
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false          # paste your Groq key in the dashboard (kept secret)
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
       - key: ENVIRONMENT
         value: production
 
@@ -44,11 +44,11 @@ services:
       - key: REDIS_URL
         sync: false
       - key: LLM_PROVIDER
-        value: anthropic
-      - key: ANTHROPIC_API_KEY
+        value: groq
+      - key: GROQ_API_KEY
         sync: false
-      - key: OPENAI_API_KEY
-        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
 
 databases:
   - name: triage-db

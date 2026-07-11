@@ -28,21 +28,3 @@ services:
         value: llama-3.1-8b-instant
       - key: ENVIRONMENT
         value: production
-
-  - type: worker
-    name: triage-worker
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    dockerCommand: arq app.workers.worker.WorkerSettings
-    plan: free
-    envVars:
-      - key: DATABASE_URL
-        sync: false          # same Neon connection string as the API
-      - key: REDIS_URL
-        sync: false
-      - key: LLM_PROVIDER
-        value: groq
-      - key: GROQ_API_KEY
-        sync: false
-      - key: GROQ_MODEL
-        value: llama-3.1-8b-instant
